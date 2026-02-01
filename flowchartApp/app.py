@@ -5,9 +5,7 @@ import copy
 from ai_services import generate_flowchart_with_ai
 
 
-# -----------------------------
-# Page setup
-# -----------------------------
+
 st.set_page_config(
     page_title="Joe's Prompt2Flow",
     layout="wide"
@@ -36,9 +34,7 @@ import textwrap
 
 from ai_services import generate_flowchart_with_ai
 
-# -----------------------------
-# Layout & Rendering Engine
-# -----------------------------
+
 
 def wrap_text(text, width=20):
     return textwrap.wrap(text, width=width)
@@ -53,31 +49,28 @@ def calculate_layout(nodes, edges):
     """
     positions = {}
     
-    # helper to fast-lookup node props
+  
     node_map = {n["id"]: n for n in nodes}
     
-    # Initialize all to center spine
+  
     for node in nodes:
         positions[node["id"]] = {"x": 500, "y": 0}
 
-    # Build adjacency list
+
     adj = {n["id"]: [] for n in nodes}
     for edge in edges:
         if edge["from"] in adj:
             adj[edge["from"]].append(edge)
 
-    # 1. Identify "levels" or just traverse and push down? 
-    # To handle overlaps properly in a flexible graph is hard.
-    # But since AI usually gives a "spine" with branches, we can traverse DFS/BFS.
+  
     
     start_node = next((n for n in nodes if n["type"] == "start"), nodes[0])
     
-    # Queue: (node_id, x, y_top) 
-    # y_top is where the node STARTS. center_y will be y_top + height/2
+
     queue = [(start_node["id"], 500, 50)] 
     visited = set()
     
-    min_gap_y = 60 # Minimum gap between nodes
+    min_gap_y = 60 
     
     while queue:
         curr_id, cx, cy_start = queue.pop(0)
@@ -86,14 +79,11 @@ def calculate_layout(nodes, edges):
             continue
         visited.add(curr_id)
         
-        # Calculate height of current node
+      
         curr_node = node_map[curr_id]
         h = calculate_node_height(curr_node["text"])
         
-        # Center Y for SVG positioning (since rects are drawn centered or top-left? 
-        # My renderer draws rects centered: y - box_height/2)
-        # So "y" in positions should be the CENTER.
-        
+
         center_y = cy_start + h/2
         positions[curr_id] = {"x": cx, "y": center_y, "height": h}
         
@@ -101,7 +91,7 @@ def calculate_layout(nodes, edges):
         if not children_edges:
             continue
             
-        # Calculate where the NEXT layer should start
+       
         next_y_start = cy_start + h + min_gap_y
         
         if len(children_edges) == 1:
@@ -109,7 +99,7 @@ def calculate_layout(nodes, edges):
             queue.append((next_id, cx, next_y_start))
         
         else:
-            # Branching
+           
             count = len(children_edges)
             span = 300 
             
@@ -120,14 +110,13 @@ def calculate_layout(nodes, edges):
                 if "yes" in lbl: nx = cx - 180
                 elif "no" in lbl: nx = cx + 180
                 else:
-                    # Distribute
-                    # If 2 nodes: -150, +150
+                    
                     offset = -180 if i == 0 else 180
                     nx = cx + offset
                 
                 queue.append((child_id, nx, next_y_start))
 
-    # Fallback for disconnected
+   
     max_y = max((p["y"] + p["height"]/2 for p in positions.values() if "height" in p), default=0)
     for node in nodes:
          if node["id"] not in visited:
@@ -144,13 +133,13 @@ def render_flowchart(flowchart):
     
     positions = calculate_layout(nodes, edges)
     
-    # Calculate SVG dimensions dynamically
+ 
     max_y = max((p["y"] for p in positions.values()), default=800) + 150
     min_x = min((p["x"] for p in positions.values()), default=0) - 100
     max_x = max((p["x"] for p in positions.values()), default=1000) + 100
     svg_width = max(1000, max_x - min_x)
     
-    # Offset everything if min_x is negative
+   
     x_offset = abs(min(0, min_x)) 
     svg_width += x_offset
 
@@ -173,7 +162,7 @@ def render_flowchart(flowchart):
       </defs>
     """
 
-    # Edges first (so they are behind nodes)
+    
     for edge in edges:
         if edge["from"] not in positions or edge["to"] not in positions:
             continue
@@ -184,12 +173,10 @@ def render_flowchart(flowchart):
         x1, y1 = p1["x"] + x_offset, p1["y"]
         x2, y2 = p2["x"] + x_offset, p2["y"]
 
-        # Orthogonal routing for cleaner look? Or straight?
-        # Straight is safer for now.
-        
+
         color = "#a0a0a0"
-        if "Yes" in str(edge.get("label")): color = "#4caf50" # Green
-        if "No" in str(edge.get("label")): color = "#ff5252" # Red
+        if "Yes" in str(edge.get("label")): color = "#4caf50" 
+        if "No" in str(edge.get("label")): color = "#ff5252" 
 
         svg += f"""
         <line x1="{x1}" y1="{y1+35}"
@@ -197,7 +184,7 @@ def render_flowchart(flowchart):
               stroke="{color}" stroke-width="2" marker-end="url(#arrow)"/>
         """
         
-        # Edge Label
+       
         if edge.get("label"):
             mx, my = (x1+x2)/2, (y1+y2)/2
             svg += f"""
@@ -207,7 +194,7 @@ def render_flowchart(flowchart):
             </text>
             """
 
-    # Draw nodes
+    
     for node in nodes:
         pid = node["id"]
         pos = positions[pid]
@@ -215,18 +202,18 @@ def render_flowchart(flowchart):
         text_lines = wrap_text(node["text"], width=20)
         node_type = node["type"]
         
-        # Dynamic height based on lines
+        
         line_height = 18
         box_height = 40 + (len(text_lines) * line_height)
         box_width = 180
         
-        # Color coding
-        stroke_color = "#4fd1c5" # Default Teal
+        
+        stroke_color = "#4fd1c5" 
         if node_type == "start": stroke_color = "#f6e05e"
         if node_type == "end": stroke_color = "#f6e05e"
-        if node_type == "decision": stroke_color = "#ff79c6" # Pink
+        if node_type == "decision": stroke_color = "#ff79c6"
 
-        # Shape rendering
+        
         if node_type in ("start", "end"):
             svg += f"""
             <rect x="{x-80}" y="{y-box_height/2}" rx="25" ry="25"
@@ -245,7 +232,7 @@ def render_flowchart(flowchart):
               stroke="{stroke_color}" stroke-width="2" fill="url(#nodeGrad)"/>
             """
 
-        # Text rendering
+       
         start_text_y = y - ((len(text_lines)-1) * line_height) / 2 + 5
         for i, line in enumerate(text_lines):
             svg += f"""
@@ -255,7 +242,7 @@ def render_flowchart(flowchart):
 
     svg += "</svg></div>"
 
-    # Toolbar and Container
+    
     unique_id = f"flowchart_{id(flowchart)}"
     
     html_content = f"""
@@ -387,9 +374,7 @@ def render_flowchart(flowchart):
     return html_content
 
 
-# -----------------------------
-# UI
-# -----------------------------
+
 prompt = st.text_area(
     "Enter your problem statement",
     placeholder="Example: Check whether a number is even or odd"
@@ -409,9 +394,7 @@ if st.button("Generate Flowchart"):
             st.error("Error generating flowchart")
             st.code(str(e))
 
-# -----------------------------
-# Footer
-# -----------------------------
+
 st.markdown(
     """
     <div style="
